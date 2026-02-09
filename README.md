@@ -5,3 +5,7 @@ A flexible Nextflow pipeline for the read combination, trimming, mapping, dedupl
 All software used in this pipeline is available via Docker. Feel free to use Docker or convert to a Singularity container when running the pipeline.
 
 https://hub.docker.com/r/nolandocker/peak-flex
+
+```
+apptainer build peak-flex.sif docker://nolandocker/peak-flex:v0.01
+```
