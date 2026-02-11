@@ -1,9 +1,8 @@
-params.samplesheet = "${baseDir}/Samplesheets/samples_largetest_inputDependent2.csv"
+params.samplesheet = "${baseDir}/input-sheet/RAD_3reps_3-26-25.csv"
 params.outdir = "${baseDir}/results"
-params.index = "/Zulu/bnolan/Annotations/mouse/Indexes/Bowtie2_mm10/"
-params.spikeindex = "/Zulu/bnolan/Annotations/dmel/Dmel_A4_1.0/" 
-params.threads = "4"
-params.ipcontrol = false
+params.index = ""
+params.threads = "8"
+params.ipcontrol = true
 params.broad = false
 
 include { CAT_FASTQ } from './modules/cat_fastq.nf'
@@ -20,15 +19,15 @@ include { SAMTOOLS_MERGE } from './modules/samtools_merge.nf'
 include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
 include { BAM_COVERAGE } from './modules/bam_coverage.nf'
 // include { BAM_COVERAGE_SCALE } from './modules/bam_coverage_scale.nf'
-//include { MACS3 } from './modules/macs3.nf'
-//include { FRiP } from './modules/frip.nf'
+include { MACS3 } from './modules/macs3.nf'
+include { FRiP } from './modules/frip.nf'
 include { MULTIQC } from './modules/multiqc.nf'
-//include { MULTIQC_CUSTOM_PEAKS } from './modules/multiqc_custompeaks.nf'
+include { MULTIQC_CUSTOM_PEAKS } from './modules/multiqc_custompeaks.nf'
 
 
 log.info """\
          ===================================
-         C U T & T A G - N F  P I P E L I N E    
+         P E A K - F L E X  P I P E L I N E    
          ===================================
          outdir       : ${params.outdir}
          samplesheet  : ${params.samplesheet}
@@ -217,74 +216,58 @@ workflow {
     // Setting up channels
     //MATCH INPUT TO EACH CONTROL USING THE 3RD ELEMENT IN EACH TUPLE [SAMPLE_ID, BAM, [INPUT]].
 
-    // bams_all_sorted_winput
-    //         .branch{
-    //             input: it[0].contains('input')
-    //             ip: !it[0].contains('input')
-    //         }
-    //         .set {result}
+    bams_all_sorted_winput
+            .branch{
+                input: it[0].contains('input')
+                ip: !it[0].contains('input')
+            }
+            .set {result}
 
     
-    // result.input
-    //     .collect()
-    //     .ifEmpty { Channel.of([]) }  // force emission of empty list if channel is empty
-    //     .set { input_list_ch }
+    result.input
+        .collect()
+        .ifEmpty { Channel.of([]) }  // force emission of empty list if channel is empty
+        .set { input_list_ch }
 
 
-    // // result.ip
-    // //         .combine(result.input) 
-    // //         .map{ip, bam, ikey, input, bam2, na2 ->
-    // //                             def ipgroup = ip.minus(~/_.*/)
-    // //                             def inputkey = ikey.first()
-    // //                             def inputgroup = input.minus(~/_.*/)
+    result.ip
+            .combine(result.input) 
+            .map{ip, bam, ikey, input, bam2, na2 ->
+                                def ipgroup = ip.minus(~/_.*/)
+                                def inputkey = ikey.first()
+                                def inputgroup = input.minus(~/_.*/)
 
-    // //                             if(inputkey.equals(inputgroup)){
-    // //                                 tuple(ip, bam, bam2)
-    // //                             }
-    // //         }
-    // //         .set { ipbam_inputbam_ch }
-
+                                if(inputkey.equals(inputgroup)){
+                                    tuple(ip, bam, bam2)
+                                }
+            }
+            .set { ipbam_inputbam_ch }
 
     
-    // // Step 2: Map over the 'ip' channel and try to match input from the collected list
-    // result.ip
-    //     .combine(input_list_ch)
-    //     .map { ip_tuple, input_list -> 
-    //         def (ip, bam, bam2) = ip_tuple
-    //         def ipgroup = ip.minus(~/_.*/)
-            
-    //         // Find matching input entry by group name
-    //         def match = input_list.find { it[0]?.minus(~/_.*/) == ipgroup }
-    //         if (match) {
-    //             return tuple(ip, bam, bam2, match[0], match[1], match[2])
-    //         } else {
-    //             // No match found, pad with nulls
-    //             return tuple(ip, bam, bam2, null, null, null)
-    //         }
-    //     }
-    //     .set { ipbam_inputbam_ch }
-
-    // ipbam_inputbam_ch | view
-
-    // return
 
 
-    // // MACS3 for peak calling
-    // macs3_ch = MACS3( ipbam_inputbam_ch )
-    // macs3_keypeak = macs3_ch.peak
-    // macs3_excel = macs3_ch.excel
-    // macs3_peakbam = macs3_ch.peakbam
+    // MACS3 for peak calling
+    macs3_ch = MACS3( ipbam_inputbam_ch )
+    macs3_keypeak = macs3_ch.peak
+    macs3_excel = macs3_ch.excel
+    macs3_peakbam = macs3_ch.peakbam
+    macs3_diffbind = macs3_ch.peakdiff
 
-    // // Read in frip header for MULTIQC
-    // frip_score_header_ch = Channel.fromPath("$projectDir/frip_counter_header.txt", checkIfExists: true).toList()
+    // Read in frip header for MULTIQC
+    frip_score_header_ch = Channel.fromPath("$projectDir/frip_counter_header.txt", checkIfExists: true).toList()
 
-    // // Fraction of Reads inside Peaks (FRiP score)
-    // frip_score = FRiP( macs3_peakbam, frip_score_header_ch )
+    // Fraction of Reads inside Peaks (FRiP score)
+    frip_score = FRiP( macs3_peakbam, frip_score_header_ch )
 
-    // // Read in header for MULTIQC
-    // peak_count_header_ch = Channel.fromPath("$projectDir/peak_count_header.txt", checkIfExists: true).toList()
-    // // GENERATE custom peak count entry for multiqc
-    // custom_peaks_multiqc = MULTIQC_CUSTOM_PEAKS(macs3_keypeak, peak_count_header_ch)
+    // Read in header for MULTIQC
+    peak_count_header_ch = Channel.fromPath("$projectDir/peak_count_header.txt", checkIfExists: true).toList()
+    // GENERATE custom peak count entry for multiqc
+    custom_peaks_multiqc = MULTIQC_CUSTOM_PEAKS(macs3_keypeak, peak_count_header_ch)
+
+
+    // DiffBind
+    
+
 
     // MULTIQC
     // Create multiqc report channel
@@ -292,9 +275,9 @@ workflow {
                         .mix(fastqc_trim)
                         .mix(bowtie2_summary)                    
                         .mix(bowtie2_sort_dedup_text)
-                        //.mix(macs3_excel)
-                        //.mix(custom_peaks_multiqc)
-                        //.mix(frip_score)
+                        .mix(macs3_excel)
+                        .mix(custom_peaks_multiqc)
+                        .mix(frip_score)
                         .collect()
 
     // Run MULTIQC

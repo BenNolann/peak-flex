@@ -9,7 +9,8 @@ process MACS3 {
 
     output:
     tuple val(key), path("*eak"), emit: peak
-    //tuple val(key), path("*eak"), path(bamip), emit: peakbam
+    tuple val(key), path("*eak"), path(bamip), emit: peakbam
+    tuple val(key), path(bamip), path(baminput), path("*narrowPeak"), emit: peakdiff
     path("*.xls"), emit: excel
     path("*"), emit: allelse
 
@@ -18,8 +19,11 @@ process MACS3 {
     macs3 \\
             callpeak \\
             -t $bamip \\
+            -c $baminput \\
             -g hs \\
             -n $key \\
+            --nomodel \\
+            --extsize 200 \\
             --call-summits
     """ 
 }

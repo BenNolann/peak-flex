@@ -13,7 +13,7 @@ process FRiP {
 
     script:
     """
-    READS_IN_PEAKS=\$(intersectBed -bed -a $bam -b $peak | wc -l)
+    READS_IN_PEAKS=\$(intersectBed -bed -a $peak -b $bam | wc -l)
     samtools flagstat $bam > ${bam}.flagstat
     grep 'mapped (' ${bam}.flagstat | grep -v "primary" | awk -v a="\$READS_IN_PEAKS" -v OFS='\t' '{print "${key}", a/\$1}' | cat $frip_score_header - > ${key}.frip_score_mqc.tsv
     """
